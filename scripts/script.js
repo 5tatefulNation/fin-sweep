@@ -11,8 +11,8 @@ $(document).ready(function () {
             // Replace 'YOUR_API_KEY' with your actual Alpha Vantage API key
             const apiKey = 'VEFSYZAYPDWN2Z88';
 
-            // Build the URL for fetching stock data
-            const url = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=5min&apikey=${apiKey}`;
+            // Build the URL for fetching stock metrics
+            const url = `https://www.alphavantage.co/query?function=OVERRVIEW&symbol=${symbol}&apikey=${apiKey}`;
 
             // Make the AJAX request
             $.ajax({
@@ -25,25 +25,27 @@ $(document).ready(function () {
                     // Create a data display object
                     const displayData = {
                         symbol: symbol,
-                        lastRefreshed: data['Meta Data']['3. Last Refreshed'],
-                        interval: data['Meta Data']['4. Interval'],
-                        open: data['Time Series (5min)'][Object.keys(data['Time Series (5min)'])[0]]['1. open'],
-                        high: data['Time Series (5min)'][Object.keys(data['Time Series (5min)'])[0]]['2. high'],
-                        low: data['Time Series (5min)'][Object.keys(data['Time Series (5min)'])[0]]['3. low'],
-                        close: data['Time Series (5min)'][Object.keys(data['Time Series (5min)'])[0]]['4. close'],
-                        volume: data['Time Series (5min)'][Object.keys(data['Time Series (5min)'])[0]]['5. volume']
+                        debtToEquity: data['DebtToEquityRatioTTM'],
+                        marketCap: data['MarketCapitalization'],
+                        enterpriseValue: data['EnterpriseValue'],
+                        earningsYield: data['EarningsYieldTTM'],
+                        peRatio: data['PEGRatio'],
+                        priceToFreeCashFlow: data['PriceToFreeCashFlowsTTM'],
+                        roe: data['ReturnOnEquityTTM'],
+                        roi: data['ReturnOnInvestmentTTM']
                     };
 
                     // Display the data
                     $('#dataDisplay').html(`
-                        <h3>Stock Data for ${displayData.symbol}</h3>
-                        <p>Last Refreshed: ${displayData.lastRefreshed}</p>
-                        <p>Interval: ${displayData.interval}</p>
-                        <p>Open: ${displayData.open}</p>
-                        <p>High: ${displayData.high}</p>
-                        <p>Low: ${displayData.low}</p>
-                        <p>Close: ${displayData.close}</p>
-                        <p>Volume: ${displayData.volume}</p>
+                        <h3>Financial Metrics for ${displayData.symbol}</h3>
+                        <p>Debt to Equity Ratio: ${displayData.debtToEquity || 'N/A'}</p>
+                        <p>Market Capitalization: ${displayData.marketCap || 'N/A'}</p>
+                        <p>Enterprise Value: ${displayData.enterpriseValue || 'N/A'}</p>
+                        <p>Earnings Yield: ${displayData.earningsYield || 'N/A'}</p>
+                        <p>P/E Ratio: ${displayData.peRatio || 'N/A'}</p>
+                        <p>Price to Free Cash Flow: ${displayData.priceToFreeCashFlow || 'N/A'}</p>
+                        <p>ROE: ${displayData.roe || 'N/A'}</p>
+                        <p>ROI: ${displayData.roi || 'N/A'}</p>
                     `);
                 },
                 error: function (xhr, status, error) {
