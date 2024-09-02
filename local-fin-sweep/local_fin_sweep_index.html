@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>(Local) Fin Sweep</title>
+    <link rel="stylesheet" href="styles/style.css">
+</head>
+<body>
+    <h1>(Local) Fin Sweep</h1>
+    <h2>Get a score on whether to invest in a stock</h2>
+
+    <h3>Enter a stock symbol to get the metrics you care about</h3>
+
+    <!-- User Input Form -->
+    <form id="userForm">
+        <label for="stock_symbol">Stock Symbol</label>
+        <input type="text" id="stock_symbol" name="stock_symbol" maxlength="30">
+
+        <button type="submit">Submit</button>
+    </form>
+
+    <!-- Display Area -->
+    <div id="dataDisplay"></div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="scripts/script.js"></script>
+</body>
+</html>
