@@ -1,0 +1,158 @@
+import requests
+import logging
+import sys
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+API_KEY = '3df0a1cd95b65ad7766e0e59a87921258e42996d'
+BASE_URL = "https://public-api.quickfs.net/v1"
+
+def get_user_input():
+    logger.debug("Starting user input collection")
+    user_input = {}  # Initialize the dictionary to store user input
+
+    while True:
+        market_cap_low = float(input("Enter the lower limit for market cap (in millions): "))
+        market_cap_high = float(input("Enter the upper limit for market cap (in millions): "))
+        if market_cap_low <= market_cap_high:
+            break
+        else:
+            print("Invalid range. The lower limit must be less than or equal to the upper limit. Please re-enter.")
+
+    while True:
+        pe_ratio_low = float(input("Enter the lower limit for PE ratio: "))
+        pe_ratio_high = float(input("Enter the upper limit for PE ratio: "))
+        if pe_ratio_low <= pe_ratio_high:
+            break
+        else:
+            print("Invalid range. The lower limit must be less than or equal to the upper limit. Please re-enter.")
+
+    while True:
+        price_to_fcf_low = float(input("Enter the lower limit for Price to free cash flow: "))
+        price_to_fcf_high = float(input("Enter the upper limit for Price to free cash flow: "))
+        if price_to_fcf_low <= price_to_fcf_high:
+            break
+        else:
+            print("Invalid range. The lower limit must be less than or equal to the upper limit. Please re-enter.")
+
+    roic = float(input("Enter the greater than 5-year average ROIC criteria: "))
+    roe = float(input("Enter the greater than 5-year average ROE criteria: "))
+    debt_to_equity = float(input("Enter the less than Debt to equity ratio criteria: "))
+    
+    # Store inputs in the dictionary
+    user_input = {
+        'market_cap_low': market_cap_low * 1000000,  # Convert to actual value from millions
+        'market_cap_high': market_cap_high * 1000000,
+        'pe_low': pe_ratio_low,
+        'pe_high': pe_ratio_high,
+        'pfcf_low': price_to_fcf_low,
+        'pfcf_high': price_to_fcf_high,
+        'roic': roic,
+        'roe': roe,
+        'debt_to_equity': debt_to_equity
+    }
+    
+    logger.debug("User input collected successfully")
+    return user_input
+
+def get_all_tickers():
+    logger.debug("Fetching all tickers")
+    endpoint = f"{BASE_URL}/companies/US"
+    params = {"api_key": API_KEY}
+    try:
+        response = requests.get(endpoint, params=params)
+        response.raise_for_status()  # This will raise an exception for HTTP errors
+        data = response.json()
+        logger.debug(f"Received tickers data: {str(data)[:100]}")  # Log first 100 characters
+        tickers = list(data.values())[0] if isinstance(data, dict) else data
+        logger.debug(f"Number of tickers fetched: {len(tickers)}")
+        return tickers
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching tickers: {e}")
+        raise
+
+def fetch_batch_data(tickers, metrics):
+    logger.debug(f"Fetching batch data for {len(tickers)} tickers")
+    endpoint = f"{BASE_URL}/data/batch"
+    headers = {"X-QFS-API-KEY": API_KEY}
+    data = {
+        "data": {ticker: {metric: "LTM" for metric in metrics} for ticker in tickers}
+    }
+    try:
+        response = requests.post(endpoint, headers=headers, json=data)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching batch data: {e}")
+        raise
+
+def screen_stocks(criteria):
+    logger.debug("Starting stock screening process")
+    all_tickers = get_all_tickers()
+    if not isinstance(all_tickers, list):
+        raise ValueError("Expected a list of tickers, but got a different data type.")
+    
+    logger.debug(f"Number of tickers to screen: {len(all_tickers)}")
+    logger.debug(f"First few tickers: {all_tickers[:5]}")
+    
+    batch_size = 50
+    filtered_tickers = []
+
+    # First round of filtering
+    logger.debug("Starting first round of filtering")
+    for i in range(0, len(all_tickers), batch_size):
+        batch = all_tickers[i:i+batch_size]
+        batch_data = fetch_batch_data(batch, ["Price to FCF", "Market Cap"])
+        
+        for ticker, data in batch_data.items():
+            if (criteria['pfcf_low'] <= data.get('Price to FCF', float('inf')) <= criteria['pfcf_high'] and
+                criteria['market_cap_low'] <= data.get('Market Cap', 0) <= criteria['market_cap_high']):
+                filtered_tickers.append(ticker)
+        
+        logger.debug(f"Processed {i+len(batch)} out of {len(all_tickers)} tickers")
+
+    logger.debug(f"Tickers after first filter: {len(filtered_tickers)}")
+
+    # Second round: PE Ratio and Debt to Equity
+    second_filter_tickers = []
+    for i in range(0, len(filtered_tickers), batch_size):
+        batch = filtered_tickers[i:i+batch_size]
+        batch_data = fetch_batch_data(batch, ["PE Ratio", "Debt to Equity"])
+        
+        for ticker, data in batch_data.items():
+            if (criteria['pe_low'] <= data.get('PE Ratio', float('inf')) <= criteria['pe_high'] and
+                data.get('Debt to Equity', float('inf')) <= criteria['debt_to_equity']):
+                second_filter_tickers.append(ticker)
+
+    # Final round: ROIC and ROE (5-year averages)
+    final_tickers = []
+    for i in range(0, len(second_filter_tickers), batch_size):
+        batch = second_filter_tickers[i:i+batch_size]
+        batch_data = fetch_batch_data(batch, ["ROIC", "ROE"])
+        
+        for ticker, data in batch_data.items():
+            if (data.get('ROIC', 0) >= criteria['roic'] and data.get('ROE', 0) >= criteria['roe']):
+                final_tickers.append(ticker)
+
+    logger.debug(f"Final number of matching stocks: {len(final_tickers)}")
+    return final_tickers
+
+def main():
+    try:
+        print("Welcome to the Stock Screener!")
+        print("Please enter your screening criteria:")
+        user_criteria = get_user_input()
+        
+        print("\nSearching for stocks matching your criteria...")
+        matching_stocks = screen_stocks(user_criteria)
+        
+        print(f"\nFound {len(matching_stocks)} stocks matching your criteria:")
+        for stock in matching_stocks:
+            print(stock)
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+        print(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    main()
