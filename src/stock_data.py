@@ -6,12 +6,6 @@ api_key = '3df0a1cd95b65ad7766e0e59a87921258e42996d'
 print("Using API key:", api_key)
 client = QuickFS(api_key)
 
-try:
-    test_data = client.get_data_range('AAPL:US', 'revenue')
-    print("Test data:", test_data)
-except Exception as e:
-    print("Error:", str(e))
-
 def get_stock_data(symbol, metrics):
     result = {}
     for metric in metrics:
@@ -37,11 +31,10 @@ metrics = [
     'debt_to_equity',
     'market_cap',
     'enterprise_value',
-    'earnings_yield',
-    'pe_ratio',
+    'price_to_earnings',  # This is the PE ratio
     'price_to_fcf',
     'roe',
-    'roi'
+    'roic'
 ]
 
 symbols = ['AAPL:US', 'GOOGL:US', 'MSFT:US']
@@ -55,6 +48,13 @@ df_list = []
 for symbol, data in historical_data.items():
     df = pd.DataFrame(data)
     df['symbol'] = symbol
+    
+    # Calculate earnings yield as the inverse of PE ratio
+    if 'price_to_earnings' in df.columns:
+        df['earnings_yield'] = 1 / df['price_to_earnings']
+    else:
+        print(f"Warning: PE ratio not available for {symbol}, earnings yield not calculated")
+    
     df_list.append(df)
 
 final_df = pd.concat(df_list, ignore_index=True)
@@ -63,3 +63,5 @@ print(final_df.head())
 
 final_df.to_csv('stock_data.csv', index=False)
 print("Data saved to stock_data.csv")
+
+print("Final DataFrame columns:", final_df.columns)
